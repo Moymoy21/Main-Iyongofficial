@@ -1,0 +1,531 @@
+local players = game:GetService("Players")
+local coreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+
+local localPlayer = players.LocalPlayer or players:GetPropertyChangedSignal("LocalPlayer"):Wait() or players.LocalPlayer
+
+-- Main ScreenGui setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "UniversalMenuGui_Delta"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+if gethui then
+    screenGui.Parent = gethui()
+elseif syn and syn.protect_gui then
+    syn.protect_gui(screenGui)
+    screenGui.Parent = coreGui
+else
+    screenGui.Parent = coreGui
+end
+
+----------------------------------------------------
+-- MAIN CONTAINER WINDOW
+----------------------------------------------------
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 580, 0, 420)
+mainFrame.Position = UDim2.new(0.5, -290, 0.5, -210)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+mainFrame.BackgroundTransparency = 0.15
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Visible = false 
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 16)
+mainCorner.Parent = mainFrame
+
+----------------------------------------------------
+-- FLOATING TOGGLE BUTTON (Bilog sa Left-Middle)
+----------------------------------------------------
+local toggleButton = Instance.new("TextButton")
+toggleButton.Name = "MenuToggleButton"
+toggleButton.Size = UDim2.new(0, 50, 0, 50)
+toggleButton.Position = UDim2.new(0, 20, 0.5, -25) 
+toggleButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+toggleButton.BackgroundTransparency = 0.1
+toggleButton.Text = ""
+toggleButton.Active = true
+toggleButton.Parent = screenGui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggleButton
+
+local toggleStroke = Instance.new("UIStroke")
+toggleStroke.Color = Color3.fromRGB(255, 30, 30)
+toggleStroke.Thickness = 1.5
+toggleStroke.Transparency = 0.4
+toggleStroke.Parent = toggleButton
+
+local toggleIcon = Instance.new("ImageLabel")
+toggleIcon.Size = UDim2.new(0, 28, 0, 28)
+toggleIcon.Position = UDim2.new(0.5, -14, 0.5, -14)
+toggleIcon.BackgroundTransparency = 1
+toggleIcon.Image = "rbxassetid://10840244199"
+toggleIcon.ImageColor3 = Color3.fromRGB(255, 30, 30)
+toggleIcon.Parent = toggleButton
+
+----------------------------------------------------
+-- DRAGGING FEATURE
+----------------------------------------------------
+local userInputService = game:GetService("UserInputService")
+
+local function makeDraggable(frame)
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    userInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
+end
+
+makeDraggable(mainFrame)
+makeDraggable(toggleButton)
+
+----------------------------------------------------
+-- TOGGLE LOGIC
+----------------------------------------------------
+-- UPDATED TOGGLE LOGIC (Open & Close Cleanly)
+----------------------------------------------------
+local uiTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local isMenuOpen = false -- Flag para subaybayan kung bukas o sarado ang UI
+local isTweening = false -- Anti-spam check para iwas sira sa animation
+
+local function minimizeToButton()
+    if isTweening then return end
+    isTweening = true
+    
+    local closeTween = TweenService:Create(mainFrame, uiTweenInfo, {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    })
+    closeTween:Play()
+    closeTween.Completed:Connect(function()
+        mainFrame.Visible = false
+        isMenuOpen = false
+        isTweening = false
+    end)
+end
+
+local function openMenu()
+    if isTweening then return end
+    isTweening = true
+    
+    mainFrame.Visible = true
+    mainFrame.Size = UDim2.new(0, 0, 0, 0) -- Reset size bago mag-animate
+    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    
+    local openTween = TweenService:Create(mainFrame, uiTweenInfo, {
+        Size = UDim2.new(0, 580, 0, 420),
+        Position = UDim2.new(0.5, -290, 0.5, -210)
+    })
+    openTween:Play()
+    openTween.Completed:Connect(function()
+        isMenuOpen = true
+        isTweening = false
+    end)
+end
+
+-- Isang click function na lang para sa bilog na button
+toggleButton.MouseButton1Click:Connect(function()
+    if isMenuOpen then
+        minimizeToButton() -- Kung bukas, isasara niya
+    else
+        openMenu() -- Kung sarado, bubuksan niya
+    end
+end)
+
+----------------------------------------------------
+-- TOP WINDOW CONTROL DOTS
+----------------------------------------------------
+local controlsFrame = Instance.new("Frame")
+controlsFrame.Name = "Controls"
+controlsFrame.Size = UDim2.new(0, 60, 0, 20)
+controlsFrame.Position = UDim2.new(1, -75, 0, 15)
+controlsFrame.BackgroundTransparency = 1
+controlsFrame.Parent = mainFrame
+
+local colors = {Color3.fromRGB(255, 95, 87), Color3.fromRGB(254, 188, 46), Color3.fromRGB(40, 200, 64)}
+for i, color in ipairs(colors) do
+    local dot = Instance.new("TextButton")
+    dot.Name = "ControlDot" .. i
+    dot.Size = UDim2.new(0, 12, 0, 12)
+    dot.Position = UDim2.new(0, (i - 1) * 20, 0, 4)
+    dot.BackgroundColor3 = color
+    dot.BorderSizePixel = 0
+    dot.Text = ""
+    
+    local dotCorner = Instance.new("UICorner")
+    dotCorner.CornerRadius = UDim.new(1, 0)
+    dotCorner.Parent = dot
+    dot.Parent = controlsFrame
+    
+    dot.MouseButton1Click:Connect(minimizeToButton)
+end
+
+-- Top Title
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "Title"
+titleLabel.Size = UDim2.new(1, 0, 0, 40)
+titleLabel.Position = UDim2.new(0, 0, 0, 5)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "IOHUB"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 16
+titleLabel.Parent = mainFrame
+
+-- Top Left Logo
+local logo = Instance.new("ImageLabel")
+logo.Name = "Logo"
+logo.Size = UDim2.new(0, 24, 0, 24)
+logo.Position = UDim2.new(0, 15, 0, 12)
+logo.BackgroundTransparency = 1
+logo.Image = "rbxassetid://10840244199" 
+logo.ImageColor3 = Color3.fromRGB(255, 30, 30)
+logo.Parent = mainFrame
+
+----------------------------------------------------
+-- NAVIGATION & PAGES HOLDER SETUP
+----------------------------------------------------
+local sidebar = Instance.new("Frame")
+sidebar.Name = "Sidebar"
+sidebar.Size = UDim2.new(0, 160, 1, -60)
+sidebar.Position = UDim2.new(0, 10, 0, 50)
+sidebar.BackgroundTransparency = 1
+sidebar.Parent = mainFrame
+
+local uiListSide = Instance.new("UIListLayout")
+uiListSide.Padding = UDim.new(0, 8)
+uiListSide.SortOrder = Enum.SortOrder.LayoutOrder
+uiListSide.Parent = sidebar
+
+local contentFrame = Instance.new("Frame")
+contentFrame.Name = "ContentFrame"
+contentFrame.Size = UDim2.new(1, -195, 1, -65)
+contentFrame.Position = UDim2.new(0, 180, 0, 50)
+contentFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+contentFrame.BackgroundTransparency = 0.4
+contentFrame.Parent = mainFrame
+
+local contentCorner = Instance.new("UICorner")
+contentCorner.CornerRadius = UDim.new(0, 12)
+contentCorner.Parent = contentFrame
+
+local clientHeader = Instance.new("TextLabel")
+clientHeader.Size = UDim2.new(1, -30, 0, 35)
+clientHeader.Position = UDim2.new(0, 15, 0, 10)
+clientHeader.BackgroundTransparency = 1
+clientHeader.Text = "Client"
+clientHeader.TextColor3 = Color3.fromRGB(255, 255, 255)
+clientHeader.Font = Enum.Font.GothamBold
+clientHeader.TextSize = 16
+clientHeader.TextXAlignment = Enum.TextXAlignment.Left
+clientHeader.Parent = contentFrame
+
+local tabs = {}
+local pages = {}
+local activeTab = nil
+
+local function createPageContainer()
+    local scrollPage = Instance.new("ScrollingFrame")
+    scrollPage.Size = UDim2.new(1, -10, 1, -50)
+    scrollPage.Position = UDim2.new(0, 5, 0, 45)
+    scrollPage.BackgroundTransparency = 1
+    scrollPage.BorderSizePixel = 0
+    scrollPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollPage.ScrollBarThickness = 2
+    scrollPage.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+    scrollPage.Visible = false
+    scrollPage.Parent = contentFrame
+
+    local uiListContent = Instance.new("UIListLayout")
+    uiListContent.Padding = UDim.new(0, 14)
+    uiListContent.SortOrder = Enum.SortOrder.LayoutOrder
+    uiListContent.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    uiListContent.Parent = scrollPage
+    
+    uiListContent:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scrollPage.CanvasSize = UDim2.new(0, 0, 0, uiListContent.AbsoluteContentSize.Y + 20)
+    end)
+
+    return scrollPage
+end
+
+local function switchTab(tabName)
+    for name, btnElements in pairs(tabs) do
+        if name == tabName then
+            btnElements.Button.BackgroundTransparency = 0.9
+            btnElements.Icon.ImageColor3 = Color3.fromRGB(255, 100, 120)
+            btnElements.Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+            if btnElements.Stroke then btnElements.Stroke.Enabled = true end
+            
+            pages[name].Visible = true
+            clientHeader.Text = name
+        else
+            btnElements.Button.BackgroundTransparency = 1
+            btnElements.Icon.ImageColor3 = Color3.fromRGB(180, 180, 180)
+            btnElements.Label.TextColor3 = Color3.fromRGB(180, 180, 180)
+            if btnElements.Stroke then btnElements.Stroke.Enabled = false end
+            
+            pages[name].Visible = false
+        end
+    end
+    activeTab = tabName
+end
+
+local function createSidebarTab(name, iconId, order)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 36)
+    btn.BackgroundTransparency = 1
+    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = ""
+    btn.LayoutOrder = order
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    btnCorner.Parent = btn
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(150, 20, 40)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.5
+    stroke.Enabled = false
+    stroke.Parent = btn
+    
+    local icon = Instance.new("ImageLabel")
+    icon.Size = UDim2.new(0, 16, 0, 16)
+    icon.Position = UDim2.new(0, 12, 0.5, -8)
+    icon.BackgroundTransparency = 1
+    icon.Image = iconId
+    icon.ImageColor3 = Color3.fromRGB(180, 180, 180)
+    icon.Parent = btn
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -40, 1, 0)
+    lbl.Position = UDim2.new(0, 36, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name
+    lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        switchTab(name)
+    end)
+    
+    btn.Parent = sidebar
+    
+    tabs[name] = {Button = btn, Icon = icon, Label = lbl, Stroke = stroke}
+    pages[name] = createPageContainer()
+end
+
+----------------------------------------------------
+-- TOGGLE CREATOR (May On/Off switch)
+----------------------------------------------------
+local function createToggle(pageName, title, description, callback)
+    local targetPage = pages[pageName]
+    if not targetPage then return end
+
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(0.92, 0, 0, 55)
+    row.BackgroundTransparency = 1
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(0.7, 0, 0, 18)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 13
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = row
+    
+    local descLabel = Instance.new("TextLabel")
+    descLabel.Size = UDim2.new(0.75, 0, 0, 32)
+    descLabel.Position = UDim2.new(0, 0, 0, 20)
+    descLabel.BackgroundTransparency = 1
+    descLabel.Text = description
+    descLabel.TextColor3 = Color3.fromRGB(130, 130, 130)
+    descLabel.Font = Enum.Font.Gotham
+    descLabel.TextSize = 11
+    descLabel.TextWrapped = true
+    descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    descLabel.TextYAlignment = Enum.TextYAlignment.Top
+    descLabel.Parent = row
+    
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Size = UDim2.new(0, 42, 0, 22)
+    toggleBtn.Position = UDim2.new(1, -45, 0.5, -11)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    toggleBtn.Text = ""
+    
+    local tCorner = Instance.new("UICorner")
+    tCorner.CornerRadius = UDim.new(1, 0)
+    tCorner.Parent = toggleBtn
+    
+    local indicator = Instance.new("Frame")
+    indicator.Size = UDim2.new(0, 16, 0, 16)
+    indicator.Position = UDim2.new(0, 3, 0.5, -8)
+    indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    
+    local iCorner = Instance.new("UICorner")
+    iCorner.CornerRadius = UDim.new(1, 0)
+    iCorner.Parent = indicator
+    indicator.Parent = toggleBtn
+    
+    local enabled = false
+    local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    
+    toggleBtn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        if enabled then
+            TweenService:Create(toggleBtn, tweenInfo, {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            TweenService:Create(indicator, tweenInfo, {Position = UDim2.new(1, -19, 0.5, -8), BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+        else
+            TweenService:Create(toggleBtn, tweenInfo, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}):Play()
+            TweenService:Create(indicator, tweenInfo, {Position = UDim2.new(0, 3, 0.5, -8), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        end
+        if callback then callback(enabled) end
+    end)
+    
+    toggleBtn.Parent = row
+    row.Parent = targetPage
+end
+
+----------------------------------------------------
+-- NEW: BUTTON CREATOR (Katulad ng Export Configs)
+----------------------------------------------------
+local function createButton(pageName, title, description, callback)
+    local targetPage = pages[pageName]
+    if not targetPage then return end
+
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(0.92, 0, 0, 55)
+    row.BackgroundTransparency = 1
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(0.7, 0, 0, 18)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 13
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = row
+    
+    local descLabel = Instance.new("TextLabel")
+    descLabel.Size = UDim2.new(0.75, 0, 0, 32)
+    descLabel.Position = UDim2.new(0, 0, 0, 20)
+    descLabel.BackgroundTransparency = 1
+    descLabel.Text = description
+    descLabel.TextColor3 = Color3.fromRGB(130, 130, 130)
+    descLabel.Font = Enum.Font.Gotham
+    descLabel.TextSize = 11
+    descLabel.TextWrapped = true
+    descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    descLabel.TextYAlignment = Enum.TextYAlignment.Top
+    descLabel.Parent = row
+    
+    -- Ang mismong Clickable Icon Button na gaya ng nasa screenshot mo (Mouse/Click Icon)
+    local actionBtn = Instance.new("ImageButton")
+    actionBtn.Size = UDim2.new(0, 22, 0, 22)
+    actionBtn.Position = UDim2.new(1, -35, 0.5, -11)
+    actionBtn.BackgroundTransparency = 1
+    actionBtn.Image = "rbxassetid://10734896206" -- Mouse click cursor icon asset
+    actionBtn.ImageColor3 = Color3.fromRGB(200, 200, 200)
+    
+    -- Click Effect (Slight flash)
+    actionBtn.MouseButton1Click:Connect(function()
+        actionBtn.ImageColor3 = Color3.fromRGB(255, 100, 120)
+        task.wait(0.1)
+        actionBtn.ImageColor3 = Color3.fromRGB(200, 200, 200)
+        if callback then callback() end
+    end)
+    
+    actionBtn.Parent = row
+    row.Parent = targetPage
+end
+
+----------------------------------------------------
+-- POPULATING TABS & CONTENT
+----------------------------------------------------
+createSidebarTab("Welcome", "rbxassetid://10822165440", 1)
+createSidebarTab("Client", "rbxassetid://10723345479", 2)
+createSidebarTab("Core Settings", "rbxassetid://10734951111", 3)
+
+-- Welcome Tab Content
+createToggle("Welcome", "Show Intro", "Display welcome greetings on configuration execution.", function(state)
+    print("Welcome Intro Set:", state)
+end)
+
+-- Client Tab Content (Dito ko nilagay yung Teleport Buttons mo)
+createToggle("Client", "Full Bright", "Make the game brighter, easier to see or look around.", function(state)
+    print("Full Bright toggled:", state)
+end)
+
+-- HALIMBAWA NG MGA ONE-TAP BUTTONS PARA SA TELEPORT AT CFRAME:
+createButton("Client", "Teleport to Spawn", "Instant teleportation of character straight to the map's default spawn point.", function()
+    local character = localPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if rootPart then
+        rootPart.CFrame = CFrame.new(0, 10, 0) -- Baguhin mo rito ang coordinates ng pupuntahan
+        print("Successfully teleported to position!")
+    end
+end)
+
+createButton("Client", "Set CFrame Forward", "Move or shift your character's current position 10 studs forward.", function()
+    local character = localPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if rootPart then
+        rootPart.CFrame = rootPart.CFrame * CFrame.new(0, 0, -10) -- Mag-mu-move ng 10 studs pasulong
+        print("CFrame updated forward!")
+    end
+end)
+
+createToggle("Client", "Float", "Make your character float in the air.", function(state)
+    print("Float toggled:", state)
+end)
+createToggle("Client", "Float", "Make your character float in the air.", function(state)
+    print("Float toggled:", state)
+end)
+createToggle("Client", "Float", "Make your character float in the air.", function(state)
+    print("Float toggled:", state)
+end)
+createToggle("Client", "Float", "Make your character float in the air.", function(state)
+    print("Float toggled:", state)
+end)
+-- Core Settings Content
+createButton("Core Settings", "Export Configs", "Copy config to your clipboard", function()
+    if setclipboard then
+        setclipboard("Universal_Config_Active = true")
+        print("Copied to clipboard!")
+    else
+        print("Your executor does not support clipboard functions.")
+    end
+end)
+
+-- Default open tab inside frame configuration
+switchTab("Welcome")
