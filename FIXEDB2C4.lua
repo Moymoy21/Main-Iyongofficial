@@ -1064,20 +1064,68 @@ end)
 
 
 
-createButton("Section 2", "Auto Car Quest (3 Gas Cans) ", "Automates car repair with 3 Gas Cans under 3-item inventory limit.", function()
+createButton("Section 2", "Auto Car Quest (Safe Path Fix)", "Dynamic object scanner para iwas-stuck", function()
     task.spawn(function()
         local player = game:GetService("Players").LocalPlayer
         local character = player.Character
         local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return end
+        if not rootPart then 
+            warn("[IOHUB] HumanoidRootPart not found!")
+            return 
+        end
 
-        -- [[ HELPER FUNCTIONS ]]
-        local function teleportTo(cframe)
-            rootPart.Anchored = true
-            rootPart.CFrame = cframe
-            rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            task.wait(0.5) -- Physics sync delay
-            rootPart.Anchored = false
+        -- [[ AUTOMATIC BASE PATH SCANNER ]]
+        -- Hahanapin ang ChihiroMinigame kahit saan man ito sa Workspace para iwas maling folder name
+        local minigamePath = workspace:FindFirstChild("ChihiroMinigame", true) 
+        if not minigamePath then
+            -- Fallback subok sa tinatayang path mo
+            pcall(function()
+                minigamePath = workspace.Section2["5"].ChihiroMinigame
+            end)
+        end
+
+        if not minigamePath then
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "IOHUB Error",
+                Text = "Hindi mahanap ang ChihiroMinigame folder sa Workspace!",
+                Duration = 4
+            })
+            warn("[IOHUB] ChihiroMinigame base folder not found in Workspace!")
+            return
+        end
+
+        -- Dito natin kukunin ang sub-folders base sa nakita nating laro
+        local carParts = minigamePath:FindFirstChild("CarParts", true)
+        local builder = minigamePath:FindFirstChild("Builder", true)
+
+        if not carParts or not builder then
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "IOHUB Error",
+                Text = "Missing CarParts or Builder folder!",
+                Duration = 4
+            })
+            return
+        end
+
+        -- [[ SAFEST TELEPORT FUNCTION ]]
+        local function teleportTo(targetObject)
+            if not targetObject then return false end
+            local cframe
+            if targetObject:IsA("Model") then
+                cframe = targetObject:GetPivot()
+            elseif targetObject:IsA("BasePart") then
+                cframe = targetObject.CFrame
+            end
+            
+            if cframe then
+                rootPart.Anchored = true
+                rootPart.CFrame = cframe * CFrame.new(0, 1.8, 0)
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                task.wait(0.5) -- Sapat na delay para mag-sync ang physics
+                rootPart.Anchored = false
+                return true
+            end
+            return false
         end
 
         local function triggerPrompt(prompt)
@@ -1090,168 +1138,142 @@ createButton("Section 2", "Auto Car Quest (3 Gas Cans) ", "Automates car repair 
             return false
         end
 
-        -- Paths
-        local minigamePath = workspace.Section2["5"].ChihiroMinigame.CarFixObjective
-        local carParts = minigamePath.CarParts
-        local builder = minigamePath.Vehicle.Builder
-        local mainPrompt = builder.Main:FindFirstChildOfClass("ProximityPrompt")
+        local mainPrompt = builder:FindFirstChild("Main") and builder.Main:FindFirstChildOfClass("ProximityPrompt")
 
+        -- ========================================================
         -- [[ BATCH 1: FIRST 3 WHEELS (FL, FR, RL) ]]
-        local firstBatchSlots = {
-            {part = builder.FL, label = "Front Left"},
-            {part = builder.FR, label = "Front Right"},
-            {part = builder.RL, label = "Back Left"}
+        -- ========================================================
+        local wheelSlots = {
+            {part = builder:FindFirstChild("FL"), label = "Front Left"},
+            {part = builder:FindFirstChild("FR"), label = "Front Right"},
+            {part = builder:FindFirstChild("RL"), label = "Back Left"}
         }
 
-        local wheelsToInstallThisBatch = {}
-        for _, slot in ipairs(firstBatchSlots) do
-            local slotPrompt = slot.part:FindFirstChildOfClass("ProximityPrompt")
-            if slotPrompt and slotPrompt.Enabled then
-                table.insert(wheelsToInstallThisBatch, slot)
+        local wheelsToInstall = {}
+        for _, slot in ipairs(wheelSlots) do
+            if slot.part then
+                local slotPrompt = slot.part:FindFirstChildOfClass("ProximityPrompt")
+                if slotPrompt and slotPrompt.Enabled then
+                    table.insert(wheelsToInstall, slot)
+                end
             end
         end
 
-        if #wheelsToInstallThisBatch > 0 then
+        local wheelPart = carParts:FindFirstChild("Car Wheel")
+        if #wheelsToInstall > 0 and wheelPart then
             game:GetService("StarterGui"):SetCore("SendNotification", {
                 Title = "IOHUB Car",
-                Text = "Collecting 3 Wheels (Batch 1)...",
-                Duration = 3
+                Text = "Batch 1: Collecting 3 Wheels...",
+                Duration = 2
             })
-
-            -- 1. Pulutin ang 3 gulong
-            local wheelPart = carParts["Car Wheel"]
-            if wheelPart then
-                for i = 1, #wheelsToInstallThisBatch do
-                    teleportTo(wheelPart.CFrame * CFrame.new(0, 1.5, 0))
-                    local pPrompt = wheelPart:FindFirstChildOfClass("ProximityPrompt")
-                    triggerPrompt(pPrompt)
-                    task.wait(0.5)
-                end
-            end
-
-            -- 2. I-teleport sa kotse at ikabit ang mga gulong
-            for _, slot in ipairs(wheelsToInstallThisBatch) do
-                local slotPrompt = slot.part:FindFirstChildOfClass("ProximityPrompt")
-                if slotPrompt then
-                    teleportTo(slot.part.CFrame * CFrame.new(0, 1.5, 0))
-                    triggerPrompt(slotPrompt)
-                    task.wait(0.5)
-                end
-            end
-        end
-
-
-        -- [[ BATCH 2: LAST WHEEL + ENGINE + GAS CAN #1 (Exactly 3 items) ]]
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "IOHUB Car",
-            Text = "Batch 2: Last Wheel, Engine, and Gas #1...",
-            Duration = 3
-        })
-
-        -- 1. Kunin ang huling gulong (RR) kung kailangan pa
-        local rrPrompt = builder.RR:FindFirstChildOfClass("ProximityPrompt")
-        local rrNeeded = rrPrompt and rrPrompt.Enabled
-        if rrNeeded then
-            local wheelPart = carParts["Car Wheel"]
-            if wheelPart then
-                teleportTo(wheelPart.CFrame * CFrame.new(0, 1.5, 0))
+            
+            -- Pulutin ang hanggang 3 gulong
+            for i = 1, #wheelsToInstall do
+                teleportTo(wheelPart)
                 local pPrompt = wheelPart:FindFirstChildOfClass("ProximityPrompt")
                 triggerPrompt(pPrompt)
-                task.wait(0.5)
+            end
+
+            -- Isalpak sa mga slot
+            for _, slot in ipairs(wheelsToInstall) do
+                local slotPrompt = slot.part:FindFirstChildOfClass("ProximityPrompt")
+                if slotPrompt then
+                    teleportTo(slot.part)
+                    triggerPrompt(slotPrompt)
+                end
             end
         end
 
-        -- 2. Kunin ang Engine
-        local enginePart = carParts["V8 Engine"]:FindFirstChild("Meshes/ls9_Cube.001 (2)", true) 
-                           or carParts["V8 Engine"]:FindFirstChildOfClass("MeshPart") 
-                           or carParts["V8 Engine"]
+        -- ========================================================
+        -- [[ BATCH 2: LAST WHEEL + ENGINE + GAS CAN #1 ]]
+        -- ========================================================
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "IOHUB Car",
+            Text = "Batch 2: Last Wheel, Engine, Gas 1...",
+            Duration = 2
+        })
+
+        local rrPart = builder:FindFirstChild("RR")
+        local rrPrompt = rrPart and rrPart:FindFirstChildOfClass("ProximityPrompt")
+        local rrNeeded = rrPrompt and rrPrompt.Enabled
+
+        -- 1. Kuha huling gulong
+        if rrNeeded and wheelPart then
+            teleportTo(wheelPart)
+            triggerPrompt(wheelPart:FindFirstChildOfClass("ProximityPrompt"))
+        end
+
+        -- 2. Kuha Engine
+        local enginePart = carParts:FindFirstChild("V8 Engine")
         if enginePart then
-            teleportTo(enginePart.CFrame * CFrame.new(0, 1.5, 0))
-            local ePrompt = enginePart:FindFirstChildOfClass("ProximityPrompt") or enginePart.Parent:FindFirstChildOfClass("ProximityPrompt")
-            triggerPrompt(ePrompt)
-            task.wait(0.5)
+            teleportTo(enginePart)
+            triggerPrompt(enginePart:FindFirstChildOfClass("ProximityPrompt") or enginePart:FindFirstChild("ProximityPrompt", true))
         end
 
-        -- 3. Kunin ang Unang Gas Can
-        local gasPart = carParts.GasCan
+        -- 3. Kuha Gas Can 1
+        local gasPart = carParts:FindFirstChild("GasCan")
         if gasPart then
-            teleportTo(gasPart.CFrame * CFrame.new(0, 1.5, 0))
-            local gPrompt = gasPart:FindFirstChildOfClass("ProximityPrompt")
-            triggerPrompt(gPrompt)
-            task.wait(0.5)
+            teleportTo(gasPart)
+            triggerPrompt(gasPart:FindFirstChildOfClass("ProximityPrompt"))
         end
 
-        -- ISALPAK ANG BATCH 2 ITEMS SA KOTSE:
+        -- Isalpak ang Batch 2 sa Kotse
         if rrNeeded and rrPrompt then
-            teleportTo(builder.RR.CFrame * CFrame.new(0, 1.5, 0))
+            teleportTo(rrPart)
             triggerPrompt(rrPrompt)
-            task.wait(0.5)
         end
 
-        -- Ikabit ang Engine at unang Gas Can sa Main builder
-        teleportTo(builder.Main.CFrame * CFrame.new(0, 1.5, 0))
-        triggerPrompt(mainPrompt) -- Engine
-        task.wait(0.5)
-        triggerPrompt(mainPrompt) -- Gas Can #1
-        task.wait(0.5)
+        if mainPrompt then
+            teleportTo(builder:FindFirstChild("Main"))
+            triggerPrompt(mainPrompt) -- Engine
+            triggerPrompt(mainPrompt) -- Gas Can 1
+        end
 
-
-        -- [[ BATCH 3: GAS CAN #2 + GAS CAN #3 (Exactly 2 items) ]]
-        if gasPart then
+        -- ========================================================
+        -- [[ BATCH 3: GAS CAN #2 + GAS CAN #3 ]]
+        -- ========================================================
+        if gasPart and mainPrompt then
             game:GetService("StarterGui"):SetCore("SendNotification", {
                 Title = "IOHUB Car",
-                Text = "Batch 3: Collecting remaining 2 Gas Cans...",
-                Duration = 3
+                Text = "Batch 3: Delivering 2 more Gas Cans...",
+                Duration = 2
             })
-
-            -- 1. Kumuha ng 2 pang Gas Can (pabalik-balik sa spawn zone para mag-fill up o kung may 3 distinct spawns)
+            
             for i = 1, 2 do
-                teleportTo(gasPart.CFrame * CFrame.new(0, 1.5, 0))
-                local gPrompt = gasPart:FindFirstChildOfClass("ProximityPrompt")
-                triggerPrompt(gPrompt)
-                task.wait(0.5)
+                teleportTo(gasPart)
+                triggerPrompt(gasPart:FindFirstChildOfClass("ProximityPrompt"))
             end
 
-            -- 2. Ikarga ang dalawang Gas Can sa sasakyan
-            teleportTo(builder.Main.CFrame * CFrame.new(0, 1.5, 0))
-            triggerPrompt(mainPrompt) -- Gas Can #2
-            task.wait(0.5)
-            triggerPrompt(mainPrompt) -- Gas Can #3
-            task.wait(0.5)
+            teleportTo(builder:FindFirstChild("Main"))
+            triggerPrompt(mainPrompt) -- Gas Can 2
+            triggerPrompt(mainPrompt) -- Gas Can 3
         end
 
-
-        -- [[ BATCH 4: FINAL ITEM - STEERING WHEEL ]]
-        local steeringPart = carParts["Steering Wheel"]
-        if steeringPart then
+        -- ========================================================
+        -- [[ BATCH 4: STEERING WHEEL ]]
+        -- ========================================================
+        local steeringPart = carParts:FindFirstChild("Steering Wheel")
+        if steeringPart and mainPrompt then
             game:GetService("StarterGui"):SetCore("SendNotification", {
                 Title = "IOHUB Car",
                 Text = "Batch 4: Installing Steering Wheel...",
-                Duration = 3
+                Duration = 2
             })
 
-            -- Kunin ang Steering Wheel
-            teleportTo(steeringPart.CFrame * CFrame.new(0, 1.5, 0))
-            local sPrompt = steeringPart:FindFirstChildOfClass("ProximityPrompt")
-            triggerPrompt(sPrompt)
-            task.wait(0.5)
+            teleportTo(steeringPart)
+            triggerPrompt(steeringPart:FindFirstChildOfClass("ProximityPrompt"))
 
-            -- Ikabit sa sasakyan
-            teleportTo(builder.Main.CFrame * CFrame.new(0, 1.5, 0))
+            teleportTo(builder:FindFirstChild("Main"))
             triggerPrompt(mainPrompt)
-            task.wait(0.5)
         end
 
-        -- [[ MISSION COMPLETE ]]
         game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "IOHUB Success",
-            Text = "🚗 All 4 wheels, engine, steering wheel, and 3 gas cans installed successfully!",
-            Duration = 5
+            Title = "IOHUB Finished",
+            Text = "🚗 Car Quest execution done!",
+            Duration = 3
         })
     end)
 end)
-
-
 
 
 
