@@ -958,10 +958,6 @@ end)
 
 
 
-
-
-
-
 -- [[ GLOBAL VARIABLES ]]
 local HttpService = game:GetService("HttpService")
 local recordedFrames = {}
@@ -972,27 +968,37 @@ local function tableToCFrame(tbl)
     return CFrame.new(unpack(tbl))
 end
 
--- [[ AUTO-LOAD ON INJECTION ]]
-if isfile and isfile("IOHUB_PureMacro.txt") then
-    local success, data = pcall(function()
-        return HttpService:JSONDecode(readfile("IOHUB_PureMacro.txt"))
+-- [[ AUTO-LOAD VIA GITHUB HTTPGET ]]
+task.spawn(function()
+    local githubUrl = "https://raw.githubusercontent.com/Moymoy21/Main-Iyongofficial/refs/heads/main/IOHUB_PureMacro.lua"
+    
+    local success, rawData = pcall(function()
+        return game:HttpGet(githubUrl)
     end)
     
-    if success and data then
-        recordedFrames = {}
-        for _, tbl in ipairs(data) do
-            table.insert(recordedFrames, tableToCFrame(tbl))
-        end
-        task.spawn(function()
-            task.wait(2)
+    if success and rawData then
+        local decodeSuccess, data = pcall(function()
+            return HttpService:JSONDecode(rawData)
+        end)
+        
+        if decodeSuccess and data then
+            recordedFrames = {}
+            for _, tbl in ipairs(data) do
+                table.insert(recordedFrames, tableToCFrame(tbl))
+            end
+            
             game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "IOHUB Macro Loader",
-                Text = "📂 Ligtas na daan nahanap! Loaded " .. tostring(#recordedFrames) .. " frames.",
+                Title = "IOHUB Cloud Loader",
+                Text = "☁️ Macro successfully loaded from GitHub! (" .. tostring(#recordedFrames) .. " frames)",
                 Duration = 5
             })
-        end)
+        else
+            warn("[IOHUB Error] Hindi ma-parse ang JSON data mula sa GitHub link. Siguraduhing pure JSON array ang laman nito.")
+        end
+    else
+        warn("[IOHUB Error] Failed to fetch data from GitHub URL.")
     end
-end
+end)
 
 -- ==========================================
 -- BUTTON 2: THE PLAYBACK (Collision-Friendly & One-Time Play)
@@ -1017,7 +1023,7 @@ createButton("Section 2", "Play/Stop Movement Macro", "Plays back movement once 
     if #recordedFrames == 0 then
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "IOHUB Error",
-            Text = "Walang recorded frames! Siguraduhing may IOHUB_PureMacro.txt sa workspace mo.",
+            Text = "Walang recorded frames sa memory! Nabigo ang pag-load mula sa GitHub.",
             Duration = 4
         })
         return
@@ -1027,12 +1033,11 @@ createButton("Section 2", "Play/Stop Movement Macro", "Plays back movement once 
 
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "IOHUB Playback",
-        Text = "🟢 PLAYBACK STARTED! (Runs once)",
+        Text = "🟢 PLAYBACK STARTED! (From GitHub Cloud)",
         Duration = 3
     })
     
     task.spawn(function()
-        -- [[ BAGO: Tinanggal na ang while loop para ISANG BESES LANG LALAKAD ]]
         for i, targetCFrame in ipairs(recordedFrames) do
             if not isPlayingPath or not rootPart or not rootPart.Parent then break end
             
@@ -1040,7 +1045,7 @@ createButton("Section 2", "Play/Stop Movement Macro", "Plays back movement once 
             game:GetService("RunService").Heartbeat:Wait() 
         end
         
-        -- Pagkarating sa pinaka-dulo, automatic nang papatayin ang toggle status
+        -- Automatic stop toggle kapag tapos na ang buong frames list
         isPlayingPath = false
         
         game:GetService("StarterGui"):SetCore("SendNotification", {
@@ -1050,6 +1055,7 @@ createButton("Section 2", "Play/Stop Movement Macro", "Plays back movement once 
         })
     end)
 end)
+
 
 
 
