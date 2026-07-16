@@ -1090,7 +1090,7 @@ local batchData = {
 }
 
 -- [[ 3. ANG BUTTON FUNCTION ]]
-createButton("Auto Collect", "Batch Cycle", "I-cycle ang mga batches ng items at babalik sa kotse", function()
+createButton("Section 2", "Auto collect Car Parts", "I-cycle ang mga batches ng items at babalik sa kotse", function()
     local player = game:GetService("Players").LocalPlayer
     local character = player.Character
     local rootPart = character and character:FindFirstChild("HumanoidRootPart")
