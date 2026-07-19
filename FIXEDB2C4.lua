@@ -859,7 +859,7 @@ end)
 createButton("Section 2", "Batch Auto Punch Eyes", "Stable auto punch per wave with safe escalator purge", function()
     task.spawn(function()
         local player = game:GetService("Players").LocalPlayer
-        local character = player.Character
+        local character = player.Character or player.CharacterAdded:Wait()
         local rootPart = character and character:FindFirstChild("HumanoidRootPart")
         
         if not rootPart then return end
@@ -867,82 +867,86 @@ createButton("Section 2", "Batch Auto Punch Eyes", "Stable auto punch per wave w
         local section2 = workspace:FindFirstChild("Section2")
         local floor1 = section2 and section2:FindFirstChild("Floor1")
         local timedTrial = floor1 and floor1:FindFirstChild("TimedTrial")
-        local safeEscalator = CFrame.new(-1160.70581, -149.304581, -1011.77954, 0.991296649, -7.29874339e-09, 0.131647274, 8.19504553e-09, 1, -6.26657481e-09, -0.131647274, 7.29089011e-09, 0.991296649) -- Siguraduhing tama ang coords mo rito
+        local safeEscalator = CFrame.new(-1160.70581, -149.304581, -1011.77954, 0.991296649, -7.29874339e-09, 0.131647274, 8.19504553e-09, 1, -6.26657481e-09, -0.131647274, 7.29089011e-09, 0.991296649)
         
-        if not timedTrial then return end
-        
-        -- Kunin ang kasalukuyang folder base sa global counter
-        if _G.CurrentEyeWave == nil then _G.CurrentEyeWave = 1 end
-        local currentFolder = timedTrial:FindFirstChild(tostring(_G.CurrentEyeWave))
-        
-        if not currentFolder then
-            _G.CurrentEyeWave = 1
-            return
+        if not timedTrial then 
+            warn("❌ TimedTrial folder not found!")
+            return 
         end
         
-        -- Ipunin ang mga mata sa folder na ito
+        -- DYNAMIC SCANNING: Ipunin lahat ng mata mula sa active trial folders ("1" to "5")
         local activeTargets = {}
-        for _, child in pairs(currentFolder:GetChildren()) do
-            if child.Name == "EyePunch" then
-                table.insert(activeTargets, child)
-            end
-        end
         
-        if #activeTargets == 0 then
-            _G.CurrentEyeWave = (_G.CurrentEyeWave < 5) and (_G.CurrentEyeWave + 1) or 1
-            return
-        end
-        
-        -- LOOP na may tamang delays para sa stability
-        local punchCount = 0
-        for _, eye in ipairs(activeTargets) do
-            if not eye or not rootPart or not rootPart.Parent then break end
-            
-            local targetCFrame = eye:IsA("BasePart") and eye.CFrame or eye:IsA("Model") and eye:GetPivot()
-            
-            if targetCFrame then
-                punchCount = punchCount + 1
-                
-                -- 1. Stable TP
-                rootPart.CFrame = targetCFrame
-                task.wait(0.3) -- Stable delay para mag-sync
-                
-                -- 2. Optimized Prompt Fire
-                local foundPrompt = eye:FindFirstChildWhichIsA("ProximityPrompt", true)
-                if foundPrompt and foundPrompt.Enabled then
-                    foundPrompt.HoldDuration = 0
-                    for i = 1, 3 do -- Tatlong pitik para sure punch
-                        fireproximityprompt(foundPrompt)
-                        task.wait(0.1)
-                    end
-                else
-                    -- Back-up scan
-                    for _, subChild in pairs(eye:GetDescendants()) do
-                        if subChild:IsA("ProximityPrompt") and subChild.Enabled then
-                            subChild.HoldDuration = 0
-                            for i = 1, 3 do
-                                fireproximityprompt(subChild)
-                                task.wait(0.1)
-                            end
-                            break
-                        end
+        for _, trialFolder in pairs(timedTrial:GetChildren()) do
+            -- Tiyaking numero ang pangalan ng folder (e.g., "1", "2") para iwas sa ibang kalat
+            if tonumber(trialFolder.Name) then
+                for _, eye in pairs(trialFolder:GetChildren()) do
+                    -- Hahanapin ang prompt gamit ang eksaktong `.RootPart.ProximityPrompt` path o backup
+                    local rootPartModel = eye:FindFirstChild("RootPart")
+                    local prompt = rootPartModel and rootPartModel:FindFirstChild("ProximityPrompt") or eye:FindFirstChildWhichIsA("ProximityPrompt", true)
+                    
+                    if prompt and prompt.Enabled then
+                        -- I-save ang mata at ang prompt nito para diretsong tirada mamaya
+                        table.insert(activeTargets, {
+                            Instance = eye,
+                            Prompt = prompt,
+                            Root = rootPartModel or eye
+                        })
                     end
                 end
-                
-                task.wait(0.5) -- Stable delay bago lumipat sa susunod na mata
             end
         end
         
-        -- 3. Teleport sa Safe Escalator pagkatapos ng wave
-        if punchCount > 0 and rootPart and rootPart.Parent then
-            rootPart.CFrame = safeEscalator
+        -- Kung walang nahanap na mata, abiso agad at huwag nang mag-teleport
+        if #activeTargets == 0 then
+            game:GetService("StarterGui"):SetCore("SendNotification", {Title = "IOHUB", Text = "👀 Walang aktibong mata na nahanap!", Duration = 2})
+            return
         end
         
-        -- I-advance ang wave
-        _G.CurrentEyeWave = (_G.CurrentEyeWave < 5) and (_G.CurrentEyeWave + 1) or 1
+        -- SPEED RUN PUNCH: Pag-ubos sa mga target
+        local punchCount = 0
+        for _, target in ipairs(activeTargets) do
+            if not rootPart or not rootPart.Parent then break end
+            
+            local eye = target.Instance
+            local prompt = target.Prompt
+            local eyeRoot = target.Root
+            
+            -- Tiyakin kung buhay pa ang prompt bago pumunta
+            if prompt and prompt.Enabled and prompt.Parent then
+                punchCount = punchCount + 1
+                
+                -- Kunin ang posisyon ng RootPart para doon mismo mag-TP
+                local targetCFrame = eyeRoot:IsA("BasePart") and eyeRoot.CFrame or eye:GetPivot()
+                
+                -- 1. Instant TP sa tapat ng mata
+                rootPart.CFrame = targetCFrame
+                task.wait(0.15) -- Mas pinabilis na sync delay mula 0.3
+                
+                -- 2. Instant Prompt Fire (Bypass Hold)
+                prompt.HoldDuration = 0
+                
+                -- Dalawang mabilisang pitik ay sapat na para sa register ng hit
+                fireproximityprompt(prompt)
+                task.wait(0.05)
+                fireproximityprompt(prompt)
+                
+                task.wait(0.25) -- Swabeng cooldown bago lumipat sa kasunod para hindi mag-rubberband sa mobile
+            end
+        end
+        
+        -- 3. Teleport sa Safe Escalator pagkatapos linisin ang batch
+        if punchCount > 0 and rootPart and rootPart.Parent then
+            task.wait(0.2)
+            rootPart.CFrame = safeEscalator
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "IOHUB SYSTEM",
+                Text = "🔥 Naubos ang " .. tostring(punchCount) .. " mata! Safe area cleared.",
+                Duration = 3
+            })
+        end
     end)
 end)
-
 
 
 createButton("Section 2", "TP & Pickup Speaker", "TPs to Speaker, picks it up, then TPs to End Mall", function()
