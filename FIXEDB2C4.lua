@@ -528,121 +528,163 @@ createButton("Section 1", "Floor 6 NPC", "Teleport to NPC in Floor 6 and auto in
 end)
 
 
-createButton("Section 1", "Auto Code & Shovel", "Bypasses Keypad and safely collects Shovel with perfect timing", function()
-    task.spawn(function()
-        local player = game:GetService("Players").LocalPlayer
-        local character = player.Character
-        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return end
+createButton("Section 1", "Auto Code & Shovel & Rubble", "Bypasses Keypad, collects Shovel, and clears Rubble", function()
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+    local humanoid = character:WaitForChild("Humanoid")
+
+    if not rootPart then 
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Error", Text = "Character not found!", Duration = 3})
+        return 
+    end
+
+    -- [CFRAME CONFIGURATIONS]
+    local keypadCFrame = CFrame.new(4471.92773, 43.9939728, 1634.44971, 0.999974132, -3.06141068e-09, -0.00719286967, 2.99835112e-09, 1, -8.77774298e-09, 0.00719286967, 8.75594885e-09, 0.999974132)
+    local shovelCFrame = CFrame.new(4464.73975, 43.9939728, 1625.5343, 0.220124543, -8.13470194e-11, 0.975471795, -1.96750491e-10, 1, 1.27791111e-10, -0.975471795, -2.20054516e-10, 0.220124543)
+    local rubbleCFrame = CFrame.new(4449.78125, 43.9939728, 1634.13147, 0.112206995, -1.24661934e-08, 0.993684828, -2.79826584e-09, 1, 1.28613999e-08, -0.993684828, -4.22373336e-09, 0.112206995)
+
+    -- [STEP 1: SCAN CODE]
+    local floors = {"6thFloor", "5thFloor", "4thFloor", "3rdFloor", "2ndFloor", "1stFloor"}
+    local codeTable = {}
+    local success = true
+
+    for _, fName in pairs(floors) do
+        local folder = workspace:FindFirstChild("Section1")
+        local objective = folder and folder:FindFirstChild("PlayerObjective")
+        local codeNums = objective and objective:FindFirstChild("CodeNumbers")
+        local floor = codeNums and codeNums:FindFirstChild(fName)
+        local surfaceGui = floor and floor:FindFirstChild("SurfaceGui")
+        local randomLabel = surfaceGui and surfaceGui:FindFirstChild("Random")
         
-        -- [[ CONFIGURATIONS & CFRAMES ]]
-        local keypadCFrame = CFrame.new(4471.92773, 43.9939728, 1634.44971, 0.999974132, -3.06141068e-09, -0.00719286967, 2.99835112e-09, 1, -8.77774298e-09, 0.00719286967, 8.75594885e-09, 0.999974132)
-        local shovelCFrame = CFrame.new(4464.73975, 43.9939728, 1625.5343, 0.220124543, -8.13470194e-11, 0.975471795, -1.96750491e-10, 1, 1.27791111e-10, -0.975471795, -2.20054516e-10, 0.220124543)
-        
-        local floors = {"6thFloor", "5thFloor", "4thFloor", "3rdFloor", "2ndFloor", "1stFloor"}
-        local codeTable = {}
-        local success = true
-        
-        -- [[ STEP 1: SILENT CODE SCANNER ]]
-        for _, fName in pairs(floors) do
-            local folder = workspace:FindFirstChild("Section1")
-            local objective = folder and folder:FindFirstChild("PlayerObjective")
-            local codeNums = objective and objective:FindFirstChild("CodeNumbers")
-            local floor = codeNums and codeNums:FindFirstChild(fName)
-            local surfaceGui = floor and floor:FindFirstChild("SurfaceGui")
-            local randomLabel = surfaceGui and surfaceGui:FindFirstChild("Random")
-            
-            if randomLabel and randomLabel:IsA("TextLabel") then
-                local codeStr = (randomLabel.ContentText ~= "" and randomLabel.ContentText) or randomLabel.Text
-                local codeNum = tonumber(codeStr)
-                if codeNum then
-                    table.insert(codeTable, codeNum)
-                else
-                    success = false; break
-                end
-            else
-                success = false; break
+        if randomLabel and (randomLabel.ContentText ~= "" or randomLabel.Text ~= "") then
+            local codeStr = (randomLabel.ContentText ~= "" and randomLabel.ContentText) or randomLabel.Text
+            local codeNum = tonumber(codeStr)
+            if codeNum then table.insert(codeTable, codeNum) else success = false; break end
+        else
+            success = false; break
+        end
+    end
+
+    if not success or #codeTable ~= 6 then
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Error", Text = "❌ Hindi mabasa ang code!", Duration = 3})
+        return
+    end
+
+    -- [STEP 2: TP KEYPAD]
+    rootPart.CFrame = keypadCFrame
+    task.wait(0.5)
+
+    local codeDoorFolder = workspace:FindFirstChild("Section1") and workspace.Section1:FindFirstChild("PlayerObjective") and workspace.Section1.PlayerObjective:FindFirstChild("CodeDoor")
+    if codeDoorFolder then
+        for _, obj in pairs(codeDoorFolder:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") and obj.Enabled then
+                obj.HoldDuration = 0
+                fireproximityprompt(obj)
+                break
             end
         end
-        
-        -- Safe Check kung nabasa ba lahat ng floor numbers
-        if not success or #codeTable ~= 6 then
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "IOHUB Error",
-                Text = "❌ Hindi mabasa ang mga numero sa floors! Subukan ulit.",
-                Duration = 3
-            })
-            return
-        end
-        
-        -- [[ STEP 2: TP SA KEYPAD AT SPECIFIC PROMPT FIRE ]]
-        rootPart.CFrame = keypadCFrame
-        rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        task.wait(0.3) -- Sync delay pagkalapag
-        
-        -- Dito natin sinisiguro na sa CodeDoor model LANG kukuha ng prompt para hindi malito sa ibang pinto
-        local codeDoorFolder = workspace:FindFirstChild("Section1") 
-                               and workspace.Section1:FindFirstChild("PlayerObjective") 
-                               and workspace.Section1.PlayerObjective:FindFirstChild("CodeDoor")
-                               
-        if codeDoorFolder then
-            for _, obj in pairs(codeDoorFolder:GetDescendants()) do
-                if obj:IsA("ProximityPrompt") and obj.Enabled then
+        local remote = codeDoorFolder:FindFirstChild("Remote") or codeDoorFolder:FindFirstChild("RemoteEvent")
+        if remote then remote:FireServer(1, codeTable) end
+    end
+
+    task.wait(1.0) 
+
+    -- [STEP 3: TP SHOVEL]
+    rootPart.CFrame = shovelCFrame
+    task.wait(0.6) 
+
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled then
+            local parentPart = obj.Parent
+            if parentPart and (parentPart:IsA("BasePart") or parentPart:IsA("Attachment")) then
+                local promptPos = parentPart:IsA("Attachment") and parentPart.WorldPosition or parentPart.Position
+                local dist = (rootPart.Position - promptPos).Magnitude
+                if dist <= 15 then
                     obj.HoldDuration = 0
                     fireproximityprompt(obj)
-                    break -- Isang fire lang sa keypad, hinto na agad ang scan
+                    break 
                 end
             end
         end
-        task.wait(0.2)
-        
-        -- [[ STEP 3: REMOTE EVENT FIRE BYPASS ]]
-        local remote = codeDoorFolder and (codeDoorFolder:FindFirstChild("Remote") or codeDoorFolder:FindFirstChild("RemoteEvent"))
-                       
-        if remote then
-            remote:FireServer(1, codeTable)
-        end
-        
-        -- ATTEMPT DELAY: 0.8 seconds na hihintayin para maproseso ng server ang code bago lumipad sa pala
-        task.wait(0.8) 
-        
-        -- [[ STEP 4: TP SA LALAGYAN NG PALA (SHOVEL) ]]
-        rootPart.CFrame = shovelCFrame
-        rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        task.wait(0.4) -- Delay para mag-load ang shovel model at prompt sa screen mo
-        
-        -- Pagkuha ng Pala gamit ang eksaktong Pangalan nito sa workspace (Recursive search)
-        local shovelObj = workspace:FindFirstChild("Shovel", true) -- Palitan ang "Shovel" kung iba ang name sa explorer
-        if shovelObj then
-            local prompt = shovelObj:FindFirstChildWhichIsA("ProximityPrompt", true)
-            if prompt and prompt.Enabled then
-                prompt.HoldDuration = 0
-                fireproximityprompt(prompt)
-            end
-        else
-            -- Back-up scan kung sakaling naka-attach sa iba ang shovel prompt
-            for _, prompt in pairs(workspace:GetDescendants()) do
-                if prompt:IsA("ProximityPrompt") and prompt.Enabled then
-                    local target = prompt.Parent
-                    if target and (target:IsA("BasePart") or target:IsA("Attachment")) then
-                        local promptPos = target:IsA("Attachment") and target.WorldPosition or target.Position
-                        if (rootPart.Position - promptPos).Magnitude <= 15 then
-                            prompt.HoldDuration = 0
-                            fireproximityprompt(prompt)
-                            break
-                        end
-                    end
-                end
+    end
+
+    -- [STEP 4: TP RUBBLE AREA, EQUIP SHOVEL & DIRECT AUTO DIG 5X]
+    task.wait(1.2) 
+    rootPart.CFrame = rubbleCFrame
+    task.wait(0.5)
+
+    local shovelName = "Mimic@Tool_Shovel"
+    local shovelInBackpack = player.Backpack:FindFirstChild(shovelName)
+
+    if shovelInBackpack then
+        humanoid:EquipTool(shovelInBackpack)
+        task.wait(0.3)
+    else
+        for _, tool in pairs(player.Backpack:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name:find("Shovel") then
+                humanoid:EquipTool(tool)
+                task.wait(0.3)
+                break
             end
         end
+    end
+
+    local digPrompt = workspace:FindFirstChild("Section1") 
+        and workspace.Section1:FindFirstChild("PlayerObjective") 
+        and workspace.Section1.PlayerObjective:FindFirstChild("DirtDigObjective") 
+        and workspace.Section1.PlayerObjective.DirtDigObjective:FindFirstChild("Attachment") 
+        and workspace.Section1.PlayerObjective.DirtDigObjective.Attachment:FindFirstChild("ProximityPrompt")
+
+    if digPrompt then
+        digPrompt.HoldDuration = 0
+        for i = 1, 5 do
+            local attachment = digPrompt.Parent
+            local dist = (rootPart.Position - attachment.WorldPosition).Magnitude
+            
+            if dist <= 20 then
+                fireproximityprompt(digPrompt)
+            else
+                rootPart.CFrame = CFrame.new(attachment.WorldPosition + Vector3.new(0, 2, 0))
+                task.wait(0.2)
+                fireproximityprompt(digPrompt)
+            end
+            task.wait(0.7) 
+        end
+    else
+        warn("❌ DirtDigObjective Prompt missing!")
+    end
+
+    -- [STEP 5: UNLOCK & OPEN TELEPORT DOOR]
+    task.wait(0.5)
+
+    local doorPrompt = workspace:FindFirstChild("Section1")
+        and workspace.Section1:FindFirstChild("PlayerObjective")
+        and workspace.Section1.PlayerObjective:FindFirstChild("TeleportDoor")
+        and workspace.Section1.PlayerObjective.TeleportDoor:FindFirstChild("PROMPT")
+        and workspace.Section1.PlayerObjective.TeleportDoor.PROMPT:FindFirstChild("ProximityPrompt")
+
+    if doorPrompt then
+        doorPrompt.HoldDuration = 0
+        local promptParent = doorPrompt.Parent
+        local doorPos = promptParent:IsA("Attachment") and promptParent.WorldPosition or promptParent.Position
+        local distToDoor = (rootPart.Position - doorPos).Magnitude
         
-        -- [[ FINAL SUCCESS NOTIFICATION ]]
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "IOHUB Success",
-            Text = "🔓 Code Submitted & Shovel Collected Safely!",
-            Duration = 3
-        })
-    end)
+        if distToDoor > 12 then
+            rootPart.CFrame = CFrame.new(doorPos + Vector3.new(0, 2, 0))
+            task.wait(0.3)
+        end
+        
+        fireproximityprompt(doorPrompt)
+    end
+
+    -- Notification kapas tapos na lahat
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "IOHUB SYSTEM",
+        Text = "🔥 Full Run Complete!",
+        Duration = 3
+    })
 end)
 
 
