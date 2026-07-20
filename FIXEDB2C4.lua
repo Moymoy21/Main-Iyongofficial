@@ -1004,6 +1004,8 @@ end)
 
 
 
+
+
 -- [[ GLOBAL VARIABLES ]]
 local HttpService = game:GetService("HttpService")
 local recordedFrames = {}
@@ -1046,16 +1048,17 @@ task.spawn(function()
     end
 end)
 
--- ==========================================
--- BUTTON 2: THE PLAYBACK (Collision-Friendly & One-Time Play)
--- ==========================================
-createButton("Section 2", "Play/Stop Movement Macro", "Plays back movement once while keeping collisions active", function()
+-- ========================================================
+-- COMBINED BUTTON: PLAYBACK CHASE 1 & AUTO SKIP CHASE 2
+-- ========================================================
+createButton("Section 2", "Auto Run Chase 1 & Skip 2", "Runs Chase 1 from GitHub and instantly skips Chase 2", function()
     local player = game:GetService("Players").LocalPlayer
     local character = player.Character
     local rootPart = character and character:FindFirstChild("HumanoidRootPart")
     
     if not rootPart then return end
     
+    -- Kung pinindot ulit habang tumatakbo, hihinto ito
     if isPlayingPath then
         isPlayingPath = false
         game:GetService("StarterGui"):SetCore("SendNotification", {
@@ -1066,6 +1069,7 @@ createButton("Section 2", "Play/Stop Movement Macro", "Plays back movement once 
         return
     end
     
+    -- Tiyakin kung matagumpay na nakuha ang frames mula sa cloud loader
     if #recordedFrames == 0 then
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "IOHUB Error",
@@ -1079,11 +1083,12 @@ createButton("Section 2", "Play/Stop Movement Macro", "Plays back movement once 
 
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "IOHUB Playback",
-        Text = "🟢 PLAYBACK STARTED! (From GitHub Cloud)",
+        Text = "🟢 CHASE 1 MACRO STARTED! (Cloud Mode)",
         Duration = 3
     })
     
     task.spawn(function()
+        -- [STEP 1: RUN THE CHASE 1 MOVEMENTS]
         for i, targetCFrame in ipairs(recordedFrames) do
             if not isPlayingPath or not rootPart or not rootPart.Parent then break end
             
@@ -1091,28 +1096,31 @@ createButton("Section 2", "Play/Stop Movement Macro", "Plays back movement once 
             game:GetService("RunService").Heartbeat:Wait() 
         end
         
-        -- Automatic stop toggle kapag tapos na ang buong frames list
+        -- Patayin na ang macro status para sa Chase 1
         isPlayingPath = false
         
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "IOHUB Playback",
-            Text = "🏁 Nakarating na sa dulo at huminto na!",
-            Duration = 4
-        })
+        -- [STEP 2: INSTANT TELEPORT TO ELEVATOR (SKIP CHASE 2)]
+        task.wait(0.2) -- Swabeng sandaling antay pagkalapag sa dulo ng macro bago mag-skip
+        
+        if rootPart and rootPart.Parent then
+            -- Ang exact CFrame coordinates mo papuntang Elevator
+            local elevatorCFrame = CFrame.new(-3911.04688, -252.090607, -1103.42798, 0.418543696, -0.0546392314, 0.90655154, 0.00858846679, 0.998382092, 0.056208808, -0.908155978, -0.0157399513, 0.418335795)
+            
+            rootPart.CFrame = elevatorCFrame
+            
+            -- Pinal na abiso na tapos na ang buong automation process ng Section 2
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "IOHUB SYSTEM",
+                Text = "🏁 Finished Chase 1 & Auto Skipped Chase 2 to Elevator!",
+                Duration = 5
+            })
+        end
     end)
 end)
 
 
 
 
-
-createButton("Section 2", "Skip Chase 2", "Teleport to Elevator.", function()
-    local character = localPlayer.Character
-    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-    if rootPart then
-        rootPart.CFrame = CFrame.new(-3911.04688, -252.090607, -1103.42798, 0.418543696, -0.0546392314, 0.90655154, 0.00858846679, 0.998382092, 0.056208808, -0.908155978, -0.0157399513, 0.418335795) -- Baguhin mo rito ang coordinates ng pupuntahan
-    end
-end)
 
 
 
