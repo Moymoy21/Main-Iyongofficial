@@ -856,6 +856,7 @@ end)
 
 
 
+
 createButton("Section 2", "Batch Auto Punch Eyes", "Stable auto punch per wave with safe escalator purge", function()
     task.spawn(function()
         local player = game:GetService("Players").LocalPlayer
@@ -903,6 +904,29 @@ createButton("Section 2", "Batch Auto Punch Eyes", "Stable auto punch per wave w
             return
         end
         
+        -- [START ANTI-ANIMATION THREAD]
+        local punchingActive = true
+        task.spawn(function()
+            while punchingActive do
+                task.wait() -- Tumatakbo bawat frame para burahin agad ang punch anim packet
+                local currentCharacter = player.Character
+                local currentHumanoid = currentCharacter and currentCharacter:FindFirstChildOfClass("Humanoid")
+                local animator = currentHumanoid and currentHumanoid:FindFirstChildOfClass("Animator")
+                
+                if animator then
+                    for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+                        track:Stop(0) -- Instant force stop nang walang crossfade delay
+                    end
+                end
+                
+                if currentHumanoid then
+                    for _, track in pairs(currentHumanoid:GetPlayingAnimationTracks()) do
+                        track:Stop(0)
+                    end
+                end
+            end
+        end)
+        
         -- SPEED RUN PUNCH: Pag-ubos sa mga target
         local punchCount = 0
         for _, target in ipairs(activeTargets) do
@@ -921,7 +945,7 @@ createButton("Section 2", "Batch Auto Punch Eyes", "Stable auto punch per wave w
                 
                 -- 1. Instant TP sa tapat ng mata
                 rootPart.CFrame = targetCFrame
-                task.wait(0.15) -- Mas pinabilis na sync delay mula 0.3
+                task.wait(0.15) -- Sync delay
                 
                 -- 2. Instant Prompt Fire (Bypass Hold)
                 prompt.HoldDuration = 0
@@ -935,13 +959,16 @@ createButton("Section 2", "Batch Auto Punch Eyes", "Stable auto punch per wave w
             end
         end
         
+        -- [STOP ANTI-ANIMATION THREAD]
+        punchingActive = false -- Patayin ang loop bago mag-teleport sa elevator
+        
         -- 3. Teleport sa Safe Escalator pagkatapos linisin ang batch
         if punchCount > 0 and rootPart and rootPart.Parent then
             task.wait(0.2)
             rootPart.CFrame = safeEscalator
             game:GetService("StarterGui"):SetCore("SendNotification", {
                 Title = "IOHUB SYSTEM",
-                Text = "🔥 Naubos ang " .. tostring(punchCount) .. " mata! Safe area cleared.",
+                Text = "🔥 Naubos ang " .. tostring(punchCount) .. " mata! Animations restored.",
                 Duration = 3
             })
         end
